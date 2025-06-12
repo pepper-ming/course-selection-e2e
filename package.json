@@ -1,0 +1,25 @@
+{
+    "name": "course-selection-e2e",
+    "version": "1.0.0",
+    "description": "課程選課系統 E2E 自動化測試",
+    "scripts": {
+      "test": "playwright test",
+      "test:headed": "playwright test --headed",
+      "test:debug": "playwright test --debug",
+      "test:ui": "playwright test --ui",
+      "test:report": "playwright show-report",
+      "test:auth": "playwright test tests/auth.spec.js",
+      "test:course": "playwright test tests/course-query.spec.js",
+      "test:enrollment": "playwright test tests/enrollment.spec.js",
+      "test:mycourses": "playwright test tests/my-courses.spec.js",
+      "setup": "node scripts/setup-test-data.js",
+      "cleanup": "node scripts/cleanup-test-data.js"
+    },
+    "devDependencies": {
+      "@playwright/test": "^1.40.0",
+      "dotenv": "^16.3.1"
+    },
+    "engines": {
+      "node": ">=18.0.0"
+    }
+  }
