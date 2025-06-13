@@ -114,15 +114,15 @@ goto :eof
 :generate_report
 echo.
 echo 📊 生成綜合測試報告...
-REM 先嘗試生成 HTML 報告
+REM 先執行所有測試並生成報告
+call npx playwright test --reporter=html --reporter=list
+REM 然後顯示報告
 call npx playwright show-report --host 127.0.0.1 --port 9323
 if !errorlevel! neq 0 (
-    echo ⚠️  HTML 報告生成失敗，生成文字報告...
-    if exist test-results (
-        echo 📄 測試結果文件位置: test-results/
-        dir test-results /b
-    )
+    echo ⚠️  HTML 報告生成失敗，請手動查看 playwright-report 資料夾
+    echo    您可以執行: npx playwright show-report
 )
+goto :eof
 
 echo.
 echo 💡 其他有用的命令:
