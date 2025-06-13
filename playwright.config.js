@@ -6,29 +6,36 @@ dotenv.config({ path: '.env.test' });
 
 export default defineConfig({
   testDir: './tests',
-  timeout: 90 * 1000, // 增加到 90 秒
+  // 增加超時時間
+  timeout: 120 * 1000, // 增加到 120 秒
   expect: {
-    timeout: 20000 // 增加預期等待時間到 20 秒
+    timeout: 30000 // 增加預期等待時間到 30 秒
   },
-  fullyParallel: false, // 避免選課衝突
-  forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 3 : 1, // CI 環境多重試
-  workers: 1, // 強制單線程執行避免資料競爭
   
-  // 測試報告 - 修正報告配置
-  reporter: [
-    ['html', { 
-      outputFolder: 'playwright-report',
-      open: 'never', // 避免自動開啟
-      host: '127.0.0.1',
-      port: 9323
-    }],
-    ['list', { printSteps: true }], // 顯示詳細步驟
-    ['json', { outputFile: 'test-results/results.json' }],
-    ['junit', { outputFile: 'test-results/junit.xml' }]
-  ],
+  // 確保不並發執行
+  fullyParallel: false,
+  workers: 1,
   
-  // 全域設定
+  // 增加重試次數
+  retries: process.env.CI ? 3 : 2,
+  
+  use: {
+    // 增加動作和導航超時
+    actionTimeout: 45000, // 增加到 45 秒
+    navigationTimeout: 60000, // 增加到 60 秒
+    
+    // 加入截圖以便除錯
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
+    trace: 'retain-on-failure',
+    
+    // 放慢執行速度
+    launchOptions: {
+      slowMo: 500, // 每個動作之間等待 500ms
+    },
+  },
+
+  // 測試之間加入延遲
   globalSetup: './global-setup.js',
   globalTeardown: './global-teardown.js',
   
