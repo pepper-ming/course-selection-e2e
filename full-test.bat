@@ -1,4 +1,5 @@
 @echo off
+setlocal EnableDelayedExpansion
 chcp 65001 >nul
 echo 🧪 開始執行完整 E2E 測試套件...
 echo.
@@ -47,83 +48,75 @@ REM 1. 認證功能測試
 echo.
 echo 👤 執行認證功能測試...
 set /a TOTAL_TESTS+=1
-npx playwright test tests/auth.spec.js --reporter=list --output=test-results/auth
-if %errorlevel% neq 0 (
-    echo ❌ 認證測試失敗
-    set /a TEST_FAILED+=1
-) else (
-    echo ✅ 認證測試通過
-    set /a PASSED_TESTS+=1
-)
-
-REM 等待一秒避免狀態衝突
-timeout /t 2 /nobreak >nul
+call :run_test "tests/auth.spec.js" "auth" "認證測試"
 
 REM 2. 課程查詢測試  
 echo.
 echo 📚 執行課程查詢測試...
 set /a TOTAL_TESTS+=1
-npx playwright test tests/course-query.spec.js --reporter=list --output=test-results/course-query
-if %errorlevel% neq 0 (
-    echo ❌ 課程查詢測試失敗
-    set /a TEST_FAILED+=1
-) else (
-    echo ✅ 課程查詢測試通過
-    set /a PASSED_TESTS+=1
-)
-
-REM 等待一秒避免狀態衝突
-timeout /t 2 /nobreak >nul
+call :run_test "tests/course-query.spec.js" "course-query" "課程查詢測試"
 
 REM 3. 選課作業測試
 echo.
 echo 📝 執行選課作業測試...
 set /a TOTAL_TESTS+=1
-npx playwright test tests/enrollment.spec.js --reporter=list --output=test-results/enrollment
-if %errorlevel% neq 0 (
-    echo ❌ 選課作業測試失敗
-    set /a TEST_FAILED+=1
-) else (
-    echo ✅ 選課作業測試通過
-    set /a PASSED_TESTS+=1
-)
-
-REM 等待一秒避免狀態衝突
-timeout /t 2 /nobreak >nul
+call :run_test "tests/enrollment.spec.js" "enrollment" "選課作業測試"
 
 REM 4. 我的課表測試
 echo.
 echo 📅 執行我的課表測試...
 set /a TOTAL_TESTS+=1
-npx playwright test tests/my-courses.spec.js --reporter=list --output=test-results/my-courses
-if %errorlevel% neq 0 (
-    echo ❌ 我的課表測試失敗
+call :run_test "tests/my-courses.spec.js" "my-courses" "我的課表測試"
+
+REM 顯示測試結果
+call :show_results
+
+REM 生成報告
+call :generate_report
+
+pause
+exit /b !TEST_FAILED!
+
+REM ========== 子程序區域 ==========
+
+:run_test
+REM 參數: %1=測試檔案 %2=輸出目錄 %3=測試名稱
+call npx playwright test %~1 --reporter=list --output=test-results/%~2
+set TEST_RESULT=!errorlevel!
+
+if !TEST_RESULT! neq 0 (
+    echo ❌ %~3失敗
     set /a TEST_FAILED+=1
 ) else (
-    echo ✅ 我的課表測試通過
+    echo ✅ %~3通過
     set /a PASSED_TESTS+=1
 )
 
+REM 等待一秒避免狀態衝突
+timeout /t 2 /nobreak >nul
+goto :eof
+
+:show_results
 echo.
 echo =====================================
 echo 📊 測試結果統計:
-echo    總測試套件: %TOTAL_TESTS%
-echo    通過套件: %PASSED_TESTS%
-echo    失敗套件: %TEST_FAILED%
+echo    總測試套件: !TOTAL_TESTS!
+echo    通過套件: !PASSED_TESTS!
+echo    失敗套件: !TEST_FAILED!
 
-REM 檢查是否有測試失敗
-if %TEST_FAILED% gtr 0 (
-    echo ❌ 有 %TEST_FAILED% 個測試套件失敗，請查看詳細報告
-    set FINAL_RESULT=1
+if !TEST_FAILED! gtr 0 (
+    echo ❌ 有 !TEST_FAILED! 個測試套件失敗，請查看詳細報告
 ) else (
     echo 🎉 所有測試套件執行完成且通過！
-    set FINAL_RESULT=0
 )
+goto :eof
 
+:generate_report
 echo.
 echo 📊 生成綜合測試報告...
 REM 先嘗試生成 HTML 報告
-npx playwright show-report --host 127.0.0.1 --port 9323 || (
+call npx playwright show-report --host 127.0.0.1 --port 9323
+if !errorlevel! neq 0 (
     echo ⚠️  HTML 報告生成失敗，生成文字報告...
     if exist test-results (
         echo 📄 測試結果文件位置: test-results/
@@ -136,16 +129,14 @@ echo 💡 其他有用的命令:
 echo    npx playwright test --headed          - 有界面執行測試
 echo    npx playwright test --debug           - 除錯模式  
 echo    npx playwright test --ui              - 開啟測試 UI
-echo    npm run test:full                     - 使用 npm 執行完整測試
+echo    npm run test:full-sequential          - 使用 npm 執行順序測試
 echo    npx playwright show-report            - 查看詳細報告
 echo.
 
-if %FINAL_RESULT% neq 0 (
+if !TEST_FAILED! neq 0 (
     echo ⚠️  部分測試失敗，建議檢查:
     echo    1. 測試環境是否穩定
     echo    2. 測試資料是否正確
     echo    3. 前後端服務是否正常
 )
-
-pause
-exit /b %FINAL_RESULT%
+goto :eof
