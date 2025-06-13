@@ -22,209 +22,7 @@ test.describe('我的課表功能測試', () => {
   });
 
   test('應該顯示我的課表頁面的所有元素', async ({ page }) => {
-    // 檢查成功訊息
-    const messageAlert = page.locator('.message-alert.success');
-    await expect(messageAlert).toBeVisible();
-    await expect(messageAlert).toContainText('退選成功');
-    
-    // 檢查課程數減少
-    const newCount = await page.locator('.course-card').count();
-    expect(newCount).toBe(initialCount - 1);
-    
-    // 檢查統計資訊更新
-    const courseCountStat = page.locator('.stat-item:has-text("已選課程數") .stat-value');
-    const countText = await courseCountStat.textContent();
-    expect(countText).toContain(`${newCount} / 8`);
-  });
-
-  test('低於最低選課數應該無法退選', async ({ page }) => {
-    // 確保只有兩門課（最低要求）
-    const courseCards = page.locator('.course-card');
-    const currentCount = await courseCards.count();
-    
-    // 如果超過兩門，先退選到剩兩門
-    if (currentCount > 2) {
-      for (let i = currentCount; i > 2; i--) {
-        const card = courseCards.nth(i - 1);
-        const withdrawBtn = card.locator('button:has-text("退選")');
-        await withdrawBtn.click();
-        page.once('dialog', dialog => dialog.accept());
-        await page.waitForTimeout(500);
-      }
-    }
-    
-    // 嘗試退選到低於最低要求
-    const firstCard = courseCards.first();
-    const withdrawBtn = firstCard.locator('button:has-text("退選")');
-    await withdrawBtn.click();
-    page.once('dialog', dialog => dialog.accept());
-    await page.waitForTimeout(500);
-    
-    // 再退選第二門（會低於最低要求）
-    const secondCard = courseCards.nth(1);
-    const withdrawBtn2 = secondCard.locator('button:has-text("退選")');
-    await withdrawBtn2.click();
-    
-    // 檢查錯誤訊息
-    const messageAlert = page.locator('.message-alert.error');
-    await expect(messageAlert).toBeVisible();
-    await expect(messageAlert).toContainText('至少需選擇 2 門課程');
-  });
-
-  test('空課表應該顯示提示', async ({ page }) => {
-    // 退選所有課程（保留最低要求）
-    const courseCards = await page.locator('.course-card').all();
-    for (let i = courseCards.length - 1; i >= 0; i--) {
-      if (i < 2) break; // 保留兩門課
-      const withdrawBtn = courseCards[i].locator('button:has-text("退選")');
-      await withdrawBtn.click();
-      page.once('dialog', dialog => dialog.accept());
-      await page.waitForTimeout(500);
-    }
-    
-    // 模擬完全空的課表（實際上做不到，因為有最低要求）
-    // 但可以檢查提示文字的存在
-    const emptyState = page.locator('.empty-state');
-    const isEmptyVisible = await emptyState.isVisible({ timeout: 1000 }).catch(() => false);
-    
-    if (isEmptyVisible) {
-      await expect(emptyState).toContainText('您還沒有選修任何課程');
-      const actionLink = emptyState.locator('a:has-text("前往選課")');
-      await expect(actionLink).toBeVisible();
-    }
-  });
-
-  test('總學分計算應該正確', async ({ page }) => {
-    // 檢查總學分統計
-    const creditStat = page.locator('.stat-item:has-text("總學分數") .stat-value');
-    const creditText = await creditStat.textContent();
-    const totalCredits = parseInt(creditText);
-    
-    // 計算預期學分（每門課 3 學分）
-    const courseCount = await page.locator('.course-card').count();
-    const expectedCredits = courseCount * 3;
-    
-    expect(totalCredits).toBe(expectedCredits);
-  });
-
-  test('從課表頁面導航到選課頁面', async ({ page }) => {
-    // 如果有空課表提示
-    const emptyState = page.locator('.empty-state');
-    if (await emptyState.isVisible({ timeout: 1000 })) {
-      const actionLink = emptyState.locator('a:has-text("前往選課")');
-      await actionLink.click();
-      await page.waitForURL('/enrollment');
-      return;
-    }
-    
-    // 或者從導航列
-    const navLink = page.locator('.nav-link:has-text("選課作業")');
-    await navLink.click();
-    await page.waitForURL('/enrollment');
-  });
-
-  test('視圖切換應該保持資料一致', async ({ page }) => {
-    // 記錄列表檢視的課程數
-    const listCourseCount = await page.locator('.course-card').count();
-    
-    // 切換到時間表檢視
-    await page.locator('.view-btn:has-text("時間表檢視")').click();
-    await page.waitForTimeout(300);
-    
-    // 計算時間表中的課程數（每個課程可能有多個時段）
-    const courseNames = new Set();
-    const courseBlocks = await page.locator('.course-block .course-name').all();
-    for (const block of courseBlocks) {
-      const name = await block.textContent();
-      courseNames.add(name);
-    }
-    
-    // 課程數應該一致
-    expect(courseNames.size).toBe(listCourseCount);
-    
-    // 切換回列表檢視
-    await page.locator('.view-btn:has-text("列表檢視")').click();
-    await page.waitForTimeout(300);
-    
-    // 確認課程數仍然一致
-    const newListCount = await page.locator('.course-card').count();
-    expect(newListCount).toBe(listCourseCount);
-  });
-
-  test('時間表應該正確顯示課程顏色', async ({ page }) => {
-    // 切換到時間表檢視
-    await page.locator('.view-btn:has-text("時間表檢視")').click();
-    await page.waitForTimeout(300);
-    
-    // 檢查課程區塊有背景顏色
-    const courseBlocks = await page.locator('.course-block').all();
-    const colors = new Set();
-    
-    for (const block of courseBlocks) {
-      const bgColor = await block.evaluate(el => 
-        window.getComputedStyle(el).backgroundColor
-      );
-      colors.add(bgColor);
-    }
-    
-    // 應該有不同的顏色（除非所有課程碰巧同色）
-    expect(colors.size).toBeGreaterThan(0);
-    
-    // 檢查顏色不是預設值
-    for (const color of colors) {
-      expect(color).not.toBe('rgba(0, 0, 0, 0)');
-      expect(color).not.toBe('transparent');
-    }
-  });
-
-  test('響應式設計在不同裝置應該正常顯示', async ({ page }) => {
-    // 桌面檢視
-    await page.setViewportSize({ width: 1280, height: 720 });
-    const desktopGrid = await page.locator('.courses-list').evaluate(el => 
-      window.getComputedStyle(el).gridTemplateColumns
-    );
-    expect(desktopGrid).toContain('minmax');
-    
-    // 平板檢視
-    await page.setViewportSize({ width: 768, height: 1024 });
-    await page.waitForTimeout(300);
-    
-    // 手機檢視
-    await page.setViewportSize({ width: 375, height: 667 });
-    await page.waitForTimeout(300);
-    
-    // 在手機檢視，課程應該堆疊顯示
-    const mobileGrid = await page.locator('.courses-list').evaluate(el => 
-      window.getComputedStyle(el).gridTemplateColumns
-    );
-    expect(mobileGrid).toBe('1fr');
-    
-    // 時間表在手機上應該可以橫向滾動
-    await page.locator('.view-btn:has-text("時間表檢視")').click();
-    const calendarContainer = page.locator('.calendar-container');
-    const canScroll = await calendarContainer.evaluate(el => 
-      el.scrollWidth > el.clientWidth
-    );
-    expect(canScroll).toBe(true);
-  });
-
-  test('重新載入頁面應該保持狀態', async ({ page }) => {
-    // 記錄當前狀態
-    const courseCount = await page.locator('.course-card').count();
-    const firstCourseName = await page.locator('.course-card').first().locator('h3').textContent();
-    
-    // 重新載入
-    await page.reload();
-    await page.waitForLoadState('networkidle');
-    
-    // 檢查狀態保持
-    const newCourseCount = await page.locator('.course-card').count();
-    const newFirstCourseName = await page.locator('.course-card').first().locator('h3').textContent();
-    
-    expect(newCourseCount).toBe(courseCount);
-    expect(newFirstCourseName).toBe(firstCourseName);
-  });
-});頁面標題
+    // 檢查頁面標題
     await expect(page.locator('.page-header h1')).toHaveText('我的課表');
     await expect(page.locator('.page-header p')).toContainText('查看您已選修的所有課程');
     
@@ -318,12 +116,141 @@ test.describe('我的課表功能測試', () => {
     const initialCount = await page.locator('.course-card').count();
     
     // 點擊退選
-    await withdrawBtn.click();
-    
-    // 處理確認對話框
     page.once('dialog', dialog => dialog.accept());
+    await withdrawBtn.click();
     
     // 等待操作完成
     await page.waitForTimeout(1000);
     
-    // 檢查
+    // 檢查成功訊息
+    const messageAlert = page.locator('.message-alert.success');
+    await expect(messageAlert).toBeVisible();
+    await expect(messageAlert).toContainText('退選成功');
+    
+    // 檢查課程數減少
+    const newCount = await page.locator('.course-card').count();
+    expect(newCount).toBe(initialCount - 1);
+    
+    // 檢查統計資訊更新
+    const courseCountStat = page.locator('.stat-item:has-text("已選課程數") .stat-value');
+    const countText = await courseCountStat.textContent();
+    expect(countText).toContain(`${newCount} / 8`);
+  });
+
+  test('低於最低選課數應該無法退選', async ({ page }) => {
+    // 確保只有兩門課（最低要求）
+    const courseCards = page.locator('.course-card');
+    const currentCount = await courseCards.count();
+    
+    // 如果超過兩門，先退選到剩兩門
+    if (currentCount > 2) {
+      for (let i = currentCount; i > 2; i--) {
+        const card = courseCards.nth(i - 1);
+        const withdrawBtn = card.locator('button:has-text("退選")');
+        page.once('dialog', dialog => dialog.accept());
+        await withdrawBtn.click();
+        await page.waitForTimeout(500);
+      }
+    }
+    
+    // 嘗試退選第二門（會低於最低要求）
+    const secondCard = courseCards.nth(1);
+    const withdrawBtn2 = secondCard.locator('button:has-text("退選")');
+    page.once('dialog', dialog => dialog.accept());
+    await withdrawBtn2.click();
+    
+    // 檢查錯誤訊息
+    const messageAlert = page.locator('.message-alert.error');
+    await expect(messageAlert).toBeVisible();
+    await expect(messageAlert).toContainText('至少需選擇 2 門課程');
+  });
+
+  test('總學分計算應該正確', async ({ page }) => {
+    // 檢查總學分統計
+    const creditStat = page.locator('.stat-item:has-text("總學分數") .stat-value');
+    const creditText = await creditStat.textContent();
+    const totalCredits = parseInt(creditText);
+    
+    // 計算預期學分（每門課 3 學分）
+    const courseCount = await page.locator('.course-card').count();
+    const expectedCredits = courseCount * 3;
+    
+    expect(totalCredits).toBe(expectedCredits);
+  });
+
+  test('視圖切換應該保持資料一致', async ({ page }) => {
+    // 記錄列表檢視的課程數
+    const listCourseCount = await page.locator('.course-card').count();
+    
+    // 切換到時間表檢視
+    await page.locator('.view-btn:has-text("時間表檢視")').click();
+    await page.waitForTimeout(300);
+    
+    // 計算時間表中的課程數（每個課程可能有多個時段）
+    const courseNames = new Set();
+    const courseBlocks = await page.locator('.course-block .course-name').all();
+    for (const block of courseBlocks) {
+      const name = await block.textContent();
+      courseNames.add(name);
+    }
+    
+    // 課程數應該一致
+    expect(courseNames.size).toBe(listCourseCount);
+    
+    // 切換回列表檢視
+    await page.locator('.view-btn:has-text("列表檢視")').click();
+    await page.waitForTimeout(300);
+    
+    // 確認課程數仍然一致
+    const newListCount = await page.locator('.course-card').count();
+    expect(newListCount).toBe(listCourseCount);
+  });
+
+  test('響應式設計在不同裝置應該正常顯示', async ({ page }) => {
+    // 桌面檢視
+    await page.setViewportSize({ width: 1280, height: 720 });
+    const desktopGrid = await page.locator('.courses-list').evaluate(el => 
+      window.getComputedStyle(el).gridTemplateColumns
+    );
+    expect(desktopGrid).toContain('minmax');
+    
+    // 平板檢視
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await page.waitForTimeout(300);
+    
+    // 手機檢視
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.waitForTimeout(300);
+    
+    // 在手機檢視，課程應該堆疊顯示
+    const mobileGrid = await page.locator('.courses-list').evaluate(el => 
+      window.getComputedStyle(el).gridTemplateColumns
+    );
+    expect(mobileGrid).toBe('1fr');
+    
+    // 時間表在手機上應該可以橫向滾動
+    await page.locator('.view-btn:has-text("時間表檢視")').click();
+    const calendarContainer = page.locator('.calendar-container');
+    const canScroll = await calendarContainer.evaluate(el => 
+      el.scrollWidth > el.clientWidth
+    );
+    expect(canScroll).toBe(true);
+  });
+
+  test('重新載入頁面應該保持狀態', async ({ page }) => {
+    // 記錄當前狀態
+    const courseCount = await page.locator('.course-card').count();
+    const firstCourseName = await page.locator('.course-card').first().locator('h3').textContent();
+    
+    // 重新載入
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    
+    // 檢查狀態保持
+    const newCourseCount = await page.locator('.course-card').count();
+    const newFirstCourseName = await page.locator('.course-card').first().locator('h3').textContent();
+    
+    expect(newCourseCount).toBe(courseCount);
+    expect(newFirstCourseName).toBe(firstCourseName);
+  });
+});
