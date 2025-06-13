@@ -13,6 +13,7 @@
     "test:course": "playwright test tests/course-query.spec.js",
     "test:enrollment": "playwright test tests/enrollment.spec.js",
     "test:mycourses": "playwright test tests/my-courses.spec.js",
+    "test:full": "playwright test tests/auth.spec.js tests/course-query.spec.js tests/enrollment.spec.js tests/my-courses.spec.js --reporter=list",
     "setup": "node scripts/setup-test-data.js",
     "cleanup": "node scripts/cleanup-test-data.js",
     "install:browsers": "playwright install",

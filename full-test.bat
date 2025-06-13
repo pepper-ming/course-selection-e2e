@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul
 echo 🧪 開始執行完整 E2E 測試套件...
 echo.
 
@@ -43,9 +44,10 @@ echo 👤 執行認證功能測試...
 npx playwright test tests/auth.spec.js --reporter=list
 if %errorlevel% neq 0 (
     echo ❌ 認證測試失敗
-    goto :show_report
+    set TEST_FAILED=1
+) else (
+    echo ✅ 認證測試通過
 )
-echo ✅ 認證測試通過
 
 REM 2. 課程查詢測試  
 echo.
@@ -53,9 +55,10 @@ echo 📚 執行課程查詢測試...
 npx playwright test tests/course-query.spec.js --reporter=list
 if %errorlevel% neq 0 (
     echo ❌ 課程查詢測試失敗
-    goto :show_report
+    set TEST_FAILED=1
+) else (
+    echo ✅ 課程查詢測試通過
 )
-echo ✅ 課程查詢測試通過
 
 REM 3. 選課作業測試
 echo.
@@ -63,9 +66,10 @@ echo 📝 執行選課作業測試...
 npx playwright test tests/enrollment.spec.js --reporter=list
 if %errorlevel% neq 0 (
     echo ❌ 選課作業測試失敗
-    goto :show_report
+    set TEST_FAILED=1
+) else (
+    echo ✅ 選課作業測試通過
 )
-echo ✅ 選課作業測試通過
 
 REM 4. 我的課表測試
 echo.
@@ -73,15 +77,21 @@ echo 📅 執行我的課表測試...
 npx playwright test tests/my-courses.spec.js --reporter=list  
 if %errorlevel% neq 0 (
     echo ❌ 我的課表測試失敗
-    goto :show_report
+    set TEST_FAILED=1
+) else (
+    echo ✅ 我的課表測試通過
 )
-echo ✅ 我的課表測試通過
 
 echo.
 echo =====================================
-echo 🎉 所有測試執行完成！
 
-:show_report
+REM 檢查是否有測試失敗
+if defined TEST_FAILED (
+    echo ❌ 部分測試失敗，請查看詳細報告
+) else (
+    echo 🎉 所有測試執行完成且通過！
+)
+
 echo.
 echo 📊 生成測試報告...
 npx playwright show-report --host 127.0.0.1 --port 9323
