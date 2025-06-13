@@ -22,18 +22,61 @@ async function globalTeardown() {
     // 進入課表頁面
     await page.goto('http://localhost:5173/my-courses');
     await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(2000); // 等待頁面完全載入
     
     // 清理多餘的選課記錄（保留最低 2 門）
-    const withdrawButtons = await page.locator('button:has-text("退選")').all();
-    const buttonsToClick = withdrawButtons.length > 2 ? withdrawButtons.slice(0, -2) : [];
+    let attempts = 0;
+    const maxAttempts = 10; // 最多嘗試 10 次
     
-    for (let i = 0; i < buttonsToClick.length; i++) {
+    while (attempts < maxAttempts) {
+      // 重新獲取退選按鈕
+      const withdrawButtons = await page.locator('button:has-text("退選")').all();
+      console.log(`找到 ${withdrawButtons.length} 個退選按鈕`);
+      
+      // 如果只剩 2 門或更少，停止清理
+      if (withdrawButtons.length <= 2) {
+        console.log('已達到最低選課要求，停止清理');
+        break;
+      }
+      
       try {
-        page.once('dialog', dialog => dialog.accept());
-        await buttonsToClick[i].click();
-        await page.waitForTimeout(1000);
+        // 點擊第一個退選按鈕
+        const firstButton = withdrawButtons[0];
+        
+        // 檢查按鈕是否仍然可見和可點擊
+        const isVisible = await firstButton.isVisible({ timeout: 2000 }).catch(() => false);
+        const isEnabled = await firstButton.isEnabled({ timeout: 2000 }).catch(() => false);
+        
+        if (!isVisible || !isEnabled) {
+          console.log('退選按鈕不可用，跳過');
+          attempts++;
+          continue;
+        }
+        
+        // 設定對話框處理
+        page.once('dialog', dialog => {
+          console.log(`處理確認對話框: ${dialog.message()}`);
+          dialog.accept();
+        });
+        
+        console.log(`嘗試退選第 ${attempts + 1} 門課程...`);
+        await firstButton.click();
+        
+        // 等待頁面更新
+        await page.waitForTimeout(2000);
+        await page.waitForLoadState('networkidle');
+        
+        console.log(`成功退選第 ${attempts + 1} 門課程`);
+        attempts++;
+        
       } catch (error) {
-        console.warn(`清理第 ${i + 1} 筆選課記錄失敗:`, error.message);
+        console.warn(`退選第 ${attempts + 1} 門課程失敗: ${error.message}`);
+        attempts++;
+        
+        // 如果是超時錯誤，等待更長時間再重試
+        if (error.message.includes('Timeout')) {
+          await page.waitForTimeout(3000);
+        }
       }
     }
     
